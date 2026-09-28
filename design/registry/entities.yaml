@@ -49,6 +49,18 @@ last_updated: ""
 #   (health, damage, drops, faction, etc.)
 
 entities:
+  - name: redact_function_contract
+    status: active
+    source: design/gdd/networking-state-sync.md
+    referenced_by:
+      - design/gdd/networking-state-sync.md
+    signature: "redact(canonicalState, forPlayerId) -> redacted view"
+    rules: "Own hand full Card[]; opponents' hands as handCount int only; draw pile as count only (never contents); discard pile as single topCard only; sessionId never included; pure function, no caching, called fresh per connected player per broadcast; throws on unknown forPlayerId or malformed state."
+    boundary: "The ONLY code path permitted to serialize Card contents to a non-owning client."
+    notes: "Security-critical — implements Pillar 2. Reconnection & Session Identity GDD will reuse this same function for catch-up sync."
+    added: 2026-09-29
+    revised: ""
+
   - name: room_lobby_state_model
     status: active
     source: design/gdd/room-lobby.md
@@ -171,6 +183,23 @@ items: []
 # Optional: expression (the actual formula), notes
 
 formulas:
+  - name: redacted_payload_size
+    status: active
+    source: design/gdd/networking-state-sync.md
+    referenced_by:
+      - design/gdd/networking-state-sync.md
+    variables:
+      - ownHandSize
+      - cardBytes
+      - otherPlayers
+      - handCountFieldBytes
+      - baseStateBytes
+    output_range: [0, null]
+    expression: "redactedPayloadSize ≈ (ownHandSize × cardBytes) + (otherPlayers × handCountFieldBytes) + topCardBytes + drawCountBytes + baseStateBytes"
+    notes: "Sanity-check estimate, not a runtime-enforced formula. Worked example (20-card hand, 11 opponents) = 1,172 bytes, well under WebSocket Message Protocol's 16KB cap."
+    added: 2026-09-29
+    revised: ""
+
   - name: room_code_collision_probability
     status: active
     source: design/gdd/room-lobby.md
