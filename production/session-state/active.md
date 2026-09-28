@@ -1,11 +1,12 @@
 # Session State
 
 ## Current Task
-Room/Lobby GDD (Systems Design stage)
+Networking/State Sync GDD next (Systems Design stage)
 
 ## Status
-4 of 17 GDDs complete: Card/Deck Primitives, WebSocket Message Protocol, Player Identity/Session, Room Settings/Config.
-Room/Lobby: skeleton created at design/gdd/room-lobby.md, sections not yet written.
+5 of 17 GDDs complete: Card/Deck Primitives, WebSocket Message Protocol, Player Identity/Session, Room Settings/Config, Room/Lobby (all in design/gdd/, registry updated, systems index updated, status: Designed pending review).
+
+Git: forked to github.com/Poushik0603/Claude-Code-Game-Studios (origin repo access denied), pushed as of commit a54e789. User requested: no Claude co-author line on commits, commit after each completed GDD/milestone without asking each time going forward.
 
 ## Files
 - `design/gdd/systems-index.md` — systems index (just written)
@@ -21,17 +22,18 @@ Room/Lobby: skeleton created at design/gdd/room-lobby.md, sections not yet writt
 
 ## Next
 Design remaining MVP system GDDs in order:
-5. Room/Lobby
 6. Networking/State Sync
 7. Reconnection & Session Identity
+8. Rules Engine — Normal UNO
 ... (see systems-index.md Recommended Design Order for full list)
 
 Use `/design-system [system-name]` for each, in order.
-Run `/design-review` on all 4 completed GDDs in fresh sessions when convenient:
+Run `/design-review` on all 5 completed GDDs in fresh sessions when convenient:
 - design/gdd/card-deck-primitives.md
 - design/gdd/websocket-message-protocol.md
 - design/gdd/player-identity-session.md
 - design/gdd/room-settings-config.md
+- design/gdd/room-lobby.md
 
 ## Open Questions
 None blocking. UNO DOS's real ruleset still awaiting user input (not needed until Alpha tier).

@@ -35,6 +35,8 @@ This is the moment the brief describes as "everyone updates instantly" — you s
 9. **One room per session**: A session already holding membership in a room cannot `JOIN_ROOM` into a *different* room without first `LEAVE_ROOM`-ing the current one. Re-sending `JOIN_ROOM` for the *same* room the session is already in is idempotent (returns success, no duplicate membership) — this specifically supports a client retry after a dropped acknowledgment without erroring.
 10. **Starting the game**: `START_GAME` succeeds only if: sender is host, room is in `lobby` state, room has ≥2 members (brief's minimum), and `RoomSettings.mode` is a mode with an implemented Rules Engine (Room Settings/Config's Core Rule 6). On success, room state transitions to `active_game` and this system hands off control to the appropriate Rules Engine.
 11. **Kicking**: `KICK_PLAYER { targetPlayerId }` (host-only, lobby-state-only) removes the target from membership immediately and disconnects their socket's room association — they receive a clear notification (not silently dropped) before removal.
+12. **Room code retry exhaustion**: If room code generation (Core Rule 1) fails to find a unique code after 10 attempts, room creation fails outright with `ERROR_MSG code: "ROOM_CREATION_FAILED"` — the client may simply retry the entire creation request. Per the collision-probability formula, this should never occur in practice at this game's realistic scale; the cap exists purely as a defensive bound against a pathological failure mode, not as an expected code path.
+13. **PLAY_AGAIN transition**: `PLAY_AGAIN` (host-only, `results`-state-only) always transitions the room back to `lobby` state, with membership and `RoomSettings` preserved unchanged. It does not start a new game directly — the host must send `START_GAME` again when ready, reusing the existing Core Rule 10 validation (allowing settings to be adjusted between rounds if desired).
 
 ### States and Transitions
 
@@ -42,7 +44,7 @@ This is the moment the brief describes as "everyone updates instantly" — you s
 |-------|----------------|----------------|----------|
 | `lobby` | Room created | `START_GAME` succeeds | Members can join/leave, host can edit settings/kick, `ROOM_STATE_SYNC` broadcasts on every membership/settings change |
 | `active_game` | `START_GAME` succeeds | The active Rules Engine signals game end (round/match complete) | Membership is frozen (no new joins; only reconnection to existing seats); a Rules Engine owns all turn-by-turn logic |
-| `results` | Rules Engine signals game end | `PLAY_AGAIN` (→ back to `lobby` or a fresh `active_game`, host's choice/Room/Lobby's flow) or all players leave (→ room cleanup) | Standings shown; "Play Again" available to host |
+| `results` | Rules Engine signals game end | `PLAY_AGAIN` (→ `lobby`, settings/membership preserved, per Core Rule 13) or all players leave (→ room cleanup) | Standings shown; "Play Again" available to host |
 
 ### Interactions with Other Systems
 
@@ -84,7 +86,7 @@ The room_code_collision_probability formula is defined as:
 | The host attempts to kick themselves via `KICK_PLAYER { targetPlayerId: <own playerId> }` | Rejected with `ERROR_MSG` (e.g. `code: "CANNOT_KICK_SELF"`) — if the host wants to leave, `LEAVE_ROOM` is the correct action (which then triggers host migration per Core Rule 6, or room cleanup if they were the only member) | Prevents a confusing state where a "kick" and a "leave" produce different, potentially inconsistent outcomes for the same actor |
 | A room reaches `results` state, and every player disconnects/leaves before anyone sends `PLAY_AGAIN` | Same as the "last player leaves" case — the room is cleaned up | No special-casing needed; results-state rooms are cleaned up the same way as any other empty room |
 | A `Player` who was kicked or left attempts to `JOIN_ROOM` back into the same room with the same `sessionId` | Treated as a brand-new join attempt (Core Rule 2) — if the room is still in `lobby` state and has capacity, it succeeds as a new `Player` record (new `joinedAt`, at the back of the join order); being kicked does not create a standing ban in this GDD's scope | No ban/blocklist mechanic is in the brief; a kicked player can simply rejoin if the host allows it (kicking is a lobby-management tool, not a permanent exclusion) |
-| Room code generation collides on its first attempt (extremely unlikely per the formula, but must be handled) | The server regenerates a new code and retries; this can repeat until a unique code is found — no arbitrary retry limit is needed given the probabilities involved, but implementation should still cap retries defensively (e.g. 10 attempts) to avoid an infinite loop in a theoretical pathological case | Defensive coding practice — the formula shows this should never actually happen at realistic scale, but the code must not hang if it somehow did |
+| Room code generation collides on its first attempt (extremely unlikely per the formula, but must be handled) | The server regenerates a new code and retries, up to the 10-attempt cap (Core Rule 12); if the cap is exhausted, room creation fails with `ERROR_MSG code: "ROOM_CREATION_FAILED"` | Defensive coding practice — the formula shows this should never actually happen at realistic scale, but the code must not hang if it somehow did |
 
 ## Dependencies
 
@@ -165,8 +167,88 @@ The room_code_collision_probability formula is defined as:
 
 ## Acceptance Criteria
 
-[To be designed]
+### Room Creation (Core Rule 1)
+- [ ] GIVEN a session creates a new room, WHEN the room is created, THEN a 6-character room code is generated from the unambiguous alphabet (uppercase letters/digits excluding 0/O/1/I/L).
+- [ ] GIVEN a new room code is generated, WHEN it matches an already-active room's code, THEN the server regenerates a new code rather than using the collision.
+- [ ] GIVEN a room is created, WHEN its `RoomSettings` and `hostPlayerId` are inspected, THEN `RoomSettings` reflects defaults (or creation-time overrides) and `hostPlayerId` matches the creating session's `playerId`.
+
+### Joining (Core Rule 2)
+- [ ] GIVEN a valid `roomCode` for a `lobby`-state room under capacity, WHEN `JOIN_ROOM { roomCode, displayName }` is sent by a session not already in a room, THEN a new `Player` record is created and the join succeeds.
+- [ ] GIVEN an invalid/nonexistent `roomCode`, WHEN `JOIN_ROOM` is sent, THEN it is rejected with `ERROR_MSG` and no `Player` record is created.
+- [ ] GIVEN a successful join, WHEN the new `Player` record is inspected, THEN it contains `playerId`, `displayName`, `joinedAt`, and `connected: true` (and `sessionId` is retained server-internally only, never exposed to other clients per Player Identity/Session's Core Rule 7).
+
+### Membership List Ordering (Core Rule 3)
+- [ ] GIVEN a room with multiple players who joined in a specific order, WHEN the membership list is inspected at any later point (including after disconnects/reconnects), THEN it reflects the original join order, never re-sorted.
+
+### Host Designation (Core Rule 4)
+- [ ] GIVEN a newly created room, WHEN `hostPlayerId` is inspected, THEN it equals the creating session's `playerId`.
+- [ ] GIVEN a room with any membership, WHEN `hostPlayerId` is inspected at any point, THEN exactly one `Player` in the room matches it.
+
+### Host-Only Action Validation (Core Rule 5)
+- [ ] GIVEN a non-host player sends `KICK_PLAYER`, `UPDATE_ROOM_SETTINGS`, or `START_GAME`, WHEN the server validates the sender's `playerId` against `hostPlayerId`, THEN the action is rejected with `ERROR_MSG` regardless of any client-side UI restriction.
+- [ ] GIVEN the host sends any of these actions, WHEN validated, THEN the action proceeds (subject to its own additional rules).
+
+### Host Migration (Core Rule 6) — highest priority
+- [ ] GIVEN the host disconnects and exactly one other `connected: true` player remains, WHEN migration occurs, THEN `hostPlayerId` immediately reassigns to that remaining player.
+- [ ] GIVEN the host disconnects and multiple `connected: true` players remain with different `joinedAt` timestamps, WHEN migration occurs, THEN `hostPlayerId` reassigns to the player with the EARLIEST `joinedAt` among those still connected — not the most recent, not random.
+- [ ] GIVEN the host disconnects and a player who joined BEFORE the host (impossible in this system since the host is always the earliest by definition of Core Rule 1) — GIVEN instead the second-host (post-migration) disconnects with multiple remaining candidates, WHEN migration occurs again, THEN the same earliest-`joinedAt`-among-connected rule applies identically on subsequent migrations.
+- [ ] GIVEN the host disconnects and NO other `connected: true` players remain, WHEN migration is attempted, THEN no new host is assigned and the room is marked for cleanup per the Edge Cases table (not left in a zero-host lobby state).
+- [ ] GIVEN a host disconnect event, WHEN the room state is inspected at any point during or immediately after the migration, THEN there is never a moment with zero hosts or two simultaneous hosts — the reassignment is atomic with the disconnect event.
+- [ ] GIVEN host migration occurs, WHEN `ROOM_STATE_SYNC` is broadcast afterward, THEN all remaining connected clients receive the updated `hostPlayerId` reflecting the new host.
+
+### Leaving (Core Rule 7)
+- [ ] GIVEN a non-host player sends `LEAVE_ROOM`, WHEN processed, THEN their `Player` record is removed from the membership list entirely (not just marked disconnected).
+- [ ] GIVEN the host sends `LEAVE_ROOM` and other connected players remain, WHEN processed, THEN host migration (Core Rule 6) occurs first, then the leaving host's record is removed.
+
+### Lobby-Only Joining (Core Rule 8)
+- [ ] GIVEN a room in `active_game` or `results` state, WHEN a session not already in that room sends `JOIN_ROOM` with its code, THEN the join is rejected with `ERROR_MSG` — brand-new membership is not permitted outside `lobby` state.
+
+### One Room Per Session (Core Rule 9)
+- [ ] GIVEN a session already a member of Room A, WHEN it sends `JOIN_ROOM` for a different Room B, THEN the request is rejected with `ERROR_MSG` and membership in Room A is unaffected.
+- [ ] GIVEN a session already a member of Room A, WHEN it re-sends `JOIN_ROOM` for Room A again (e.g. retry after a dropped ack), THEN the request succeeds idempotently — no duplicate `Player` record is created and the original record is unaffected.
+
+### Starting the Game (Core Rule 10)
+- [ ] GIVEN the sender is host, room is `lobby` state, room has ≥2 members, and `mode` has an implemented Rules Engine, WHEN `START_GAME` is sent, THEN the room transitions to `active_game` and control is handed to the appropriate Rules Engine.
+- [ ] GIVEN the room has fewer than 2 members, WHEN the host sends `START_GAME`, THEN it is rejected with `ERROR_MSG` and the room remains in `lobby` state.
+- [ ] GIVEN a non-host sends `START_GAME`, WHEN validated, THEN it is rejected (covered also under Host-Only Action Validation).
+
+### Kicking (Core Rule 11)
+- [ ] GIVEN the host sends `KICK_PLAYER { targetPlayerId }` for a valid, non-self target during `lobby` state, WHEN processed, THEN the target's `Player` record is removed and their client receives a clear kick notification before disconnection from the room.
+- [ ] GIVEN `KICK_PLAYER` is sent while the room is in `active_game` or `results` state, WHEN validated, THEN it is rejected with `ERROR_MSG`.
+
+### Room Code Retry Exhaustion (Core Rule 12)
+- [ ] GIVEN room code generation fails to find a unique code after 10 attempts, WHEN this occurs, THEN room creation fails with `ERROR_MSG code: "ROOM_CREATION_FAILED"` rather than hanging or crashing, and the client may retry the whole request.
+
+### PLAY_AGAIN Transition (Core Rule 13)
+- [ ] GIVEN a room in `results` state, WHEN the host sends `PLAY_AGAIN`, THEN the room transitions to `lobby` state with membership and `RoomSettings` unchanged.
+- [ ] GIVEN the room has just transitioned to `lobby` via `PLAY_AGAIN`, WHEN the host sends `START_GAME`, THEN normal Core Rule 10 validation applies (no special-cased fast path).
+- [ ] GIVEN a non-host sends `PLAY_AGAIN`, WHEN validated, THEN it is rejected with `ERROR_MSG`.
+
+### Formula — Room Code Collision Probability
+- [ ] GIVEN n = 1,000 concurrent active rooms substituted into the formula, WHEN computed, THEN P_collision ≈ 0.00047, matching the documented worked example.
+- [ ] GIVEN n = 10,000 concurrent active rooms substituted into the formula, WHEN computed, THEN P_collision ≈ 0.0456, matching the documented worked example.
+
+### Edge Cases
+- [ ] GIVEN the last connected player in a room leaves or disconnects with no reconnect, WHEN this occurs, THEN the room is marked for cleanup and its room code becomes available for reuse.
+- [ ] GIVEN two sessions send `JOIN_ROOM` for the last available slot at effectively the same instant, WHEN the server processes both (in receipt order), THEN exactly one succeeds and the other is rejected with `ERROR_MSG code: "ROOM_FULL"` — no double-booking of the slot occurs.
+- [ ] GIVEN the host sends `KICK_PLAYER` targeting their own `playerId`, WHEN validated, THEN it is rejected with `ERROR_MSG code: "CANNOT_KICK_SELF"`.
+- [ ] GIVEN a room reaches `results` state and every player leaves/disconnects before `PLAY_AGAIN` is sent, WHEN this occurs, THEN the room is cleaned up identically to the empty-room case.
+- [ ] GIVEN a player who was previously kicked from a room sends `JOIN_ROOM` for that same room while it is still in `lobby` state with capacity, WHEN processed, THEN the join succeeds as a new `Player` record (no standing ban).
+- [ ] GIVEN room code generation collides on its first attempt, WHEN this occurs, THEN the server regenerates and retries (up to the 10-attempt cap in Core Rule 12) rather than failing immediately on the first collision.
+
+## Gaps Found (from qa-lead review, resolved or deferred)
+
+- **Retry-cap exhaustion (originally unhandled)**: Resolved — Core Rule 12 added, with matching acceptance criteria.
+- **PLAY_AGAIN selection mechanism (originally undefined)**: Resolved — Core Rule 13 added (always returns to `lobby`), with matching acceptance criteria.
+- **ROOM_STATE_SYNC exact payload shape**: Deferred — owned by WebSocket Message Protocol GDD; this document's criteria verify that sync fires and broadly what it reflects, not the exact wire format.
+- **Disconnect-to-host-migration real-world latency/debounce**: Deferred — owned by the not-yet-written Reconnection & Session Identity GDD; this document's criteria test the logical `connected` flag transition, not socket-drop timing.
+- **Host-is-also-last-player overlap (LEAVE_ROOM vs. migration-then-cleanup order)**: Not a functional gap — both paths produce the same outcome (room cleaned up), so no additional rule was needed.
+- **3+-way simultaneous join races**: Not explicitly tested beyond the 2-way case in Edge Cases, but the same in-order, single-threaded processing guarantee (established in Card/Deck Primitives and reused here) generalizes without requiring separate rules.
 
 ## Open Questions
 
-[To be designed]
+| Question | Owner | Deadline | Resolution |
+|----------|-------|----------|-----------|
+| Exact `ROOM_STATE_SYNC` payload shape when membership/settings change | design-system author (WebSocket Message Protocol is already written — this may need a follow-up edit to that GDD rather than a new one) | Before implementation | Open — this GDD defines when it fires and roughly what it reflects; exact wire shape should be finalized in WebSocket Message Protocol |
+| Real-world disconnect-to-host-migration latency (debounce before declaring `connected: false`) | design-system author (when Reconnection & Session Identity GDD is written) | When that GDD is authored | Open — this GDD's migration logic is correct given a `connected` flag flip; the flip's timing is Reconnection's scope |
+| Cross-References point to 2 GDDs that don't exist yet (Reconnection & Session Identity, Rules Engine — Normal UNO) | design-system author (next GDDs in order) | When each is authored | Open — must be verified, not assumed |

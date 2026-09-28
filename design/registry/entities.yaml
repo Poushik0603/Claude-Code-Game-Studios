@@ -49,6 +49,21 @@ last_updated: ""
 #   (health, damage, drops, faction, etc.)
 
 entities:
+  - name: room_lobby_state_model
+    status: active
+    source: design/gdd/room-lobby.md
+    referenced_by:
+      - design/gdd/room-lobby.md
+    states: [lobby, active_game, results]
+    player_record_fields: [playerId, displayName, sessionId, joinedAt, connected]
+    host_migration_rule: "On host disconnect, hostPlayerId reassigns to earliest-joinedAt player still connected:true. If none remain, room is marked for cleanup."
+    room_code_format: "6 chars, 32-char alphabet (36 alphanumeric minus 0/O/1/I/L), regenerate on collision, 10-attempt cap"
+    min_players_to_start: 2
+    play_again_behavior: "Always returns room to lobby state; settings/membership preserved; host must send START_GAME again"
+    notes: "One room per session enforced. New joins only permitted in lobby state."
+    added: 2026-09-29
+    revised: ""
+
   - name: room_settings_schema
     status: active
     source: design/gdd/room-settings-config.md
@@ -156,6 +171,19 @@ items: []
 # Optional: expression (the actual formula), notes
 
 formulas:
+  - name: room_code_collision_probability
+    status: active
+    source: design/gdd/room-lobby.md
+    referenced_by:
+      - design/gdd/room-lobby.md
+    variables:
+      - n
+    output_range: [0, 1]
+    expression: "P_collision ≈ 1 − e^(−n(n−1) / (2 × 32^6))"
+    notes: "6-char room codes, 32-char alphabet (36 alphanumeric minus 0/O/1/I/L). Justifies regenerate-on-collision (Core Rule 1) as sufficient without a longer code, at this game's scale (documented revisit threshold: ~1,000+ concurrent rooms)."
+    added: 2026-09-29
+    revised: ""
+
   - name: session_id_collision_probability
     status: active
     source: design/gdd/player-identity-session.md

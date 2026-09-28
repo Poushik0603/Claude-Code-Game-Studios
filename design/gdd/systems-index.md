@@ -31,7 +31,7 @@ the brief — tiers are build **order**, not permanently cut scope.
 | 2 | WebSocket Message Protocol (inferred) | Core | MVP | Designed (pending review) | design/gdd/websocket-message-protocol.md | — |
 | 3 | Player Identity/Session (inferred) | Core | MVP | Designed (pending review) | design/gdd/player-identity-session.md | — |
 | 4 | Room Settings/Config (inferred) | Core | MVP | Designed (pending review) | design/gdd/room-settings-config.md | Player Identity/Session |
-| 5 | Room/Lobby | Core | MVP | Not Started | — | Player Identity/Session, Room Settings/Config, WebSocket Message Protocol |
+| 5 | Room/Lobby | Core | MVP | Designed (pending review) | design/gdd/room-lobby.md | Player Identity/Session, Room Settings/Config, WebSocket Message Protocol |
 | 6 | Networking/State Sync | Core | MVP | Not Started | — | WebSocket Message Protocol, Player Identity/Session |
 | 7 | Reconnection & Session Identity | Core | MVP | Not Started | — | Player Identity/Session, Networking/State Sync |
 | 8 | Rules Engine — Normal UNO | Gameplay | MVP | Not Started | — | Card/Deck Primitives, Networking/State Sync |
@@ -155,10 +155,10 @@ None yet — animations and polish pass are scoped later (Vertical Slice UX pass
 | Metric | Count |
 |---|---|
 | Total systems identified | 17 |
-| Design docs started | 4 |
+| Design docs started | 5 |
 | Design docs reviewed | 0 |
 | Design docs approved | 0 |
-| MVP systems designed | 4/13 |
+| MVP systems designed | 5/13 |
 | Vertical Slice systems designed | 0/1 |
 
 ---
