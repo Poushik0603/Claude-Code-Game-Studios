@@ -1,0 +1,14 @@
+{
+  "name": "multiplayer-turn-loop-concept",
+  "private": true,
+  "version": "0.0.0",
+  "description": "PROTOTYPE - NOT FOR PRODUCTION. Tests real-time server-authoritative turn sync.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5",
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,121 @@
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: Can a single Node/Socket.IO room serialize concurrent actions and -->
+<!--           broadcast authoritative state to N clients with no desync/lag? -->
+<!-- Date: 2026-09-28 -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>UNO Prototype — Turn Loop</title>
+<style>
+  body { font-family: sans-serif; background: #222; color: #eee; padding: 20px; }
+  #join { margin-bottom: 20px; }
+  #table { display: none; }
+  .card {
+    display: inline-block; width: 60px; height: 90px; margin: 4px;
+    border-radius: 8px; text-align: center; line-height: 90px;
+    font-weight: bold; font-size: 20px; cursor: pointer; border: 3px solid #000;
+    user-select: none;
+  }
+  .card.red { background: #d33; color: white; }
+  .card.blue { background: #37d; color: white; }
+  .card.wild { background: linear-gradient(45deg,#d33,#37d,#3d3,#dd3); color: white; }
+  .card.illegal { opacity: 0.35; cursor: not-allowed; }
+  .card.legal { outline: 3px solid #3f3; }
+  #top { text-align: center; margin: 20px 0; }
+  #players { margin-bottom: 20px; }
+  .player { padding: 6px; }
+  .player.turn { background: #444; border-left: 4px solid #3f3; }
+  #msg { color: #f66; font-weight: bold; min-height: 20px; }
+  #hand { text-align: center; }
+  button { padding: 8px 16px; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<div id="join">
+  <h2>UNO Prototype — Multiplayer Turn Loop</h2>
+  <p>Open this page in multiple tabs/windows to simulate multiple players.</p>
+  <input id="nameInput" placeholder="Your name" />
+  <button onclick="joinRoom()">Join Room</button>
+</div>
+
+<div id="table">
+  <div id="players"></div>
+  <div id="top">Top card: <span id="topCard"></span> | Active color: <span id="activeColor"></span></div>
+  <div id="msg"></div>
+  <div id="hand"></div>
+  <div style="text-align:center; margin-top: 10px;">
+    <button onclick="drawCard()">Draw Card</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  let myId = null;
+  let lastState = null;
+
+  socket.on("connect", () => { myId = socket.id; });
+
+  function joinRoom() {
+    const name = document.getElementById("nameInput").value || "Player";
+    socket.emit("JOIN_ROOM", { name });
+    document.getElementById("join").style.display = "none";
+    document.getElementById("table").style.display = "block";
+  }
+
+  function drawCard() {
+    socket.emit("DRAW_CARD");
+  }
+
+  function playCard(index) {
+    socket.emit("PLAY_CARD", { cardIndex: index });
+  }
+
+  function isLegal(card, top, activeColor) {
+    if (card.color === "wild") return true;
+    if (card.color === activeColor) return true;
+    if (card.value === top.value) return true;
+    return false;
+  }
+
+  socket.on("STATE_SYNC", (state) => {
+    lastState = state;
+    document.getElementById("msg").textContent = "";
+
+    document.getElementById("topCard").textContent = state.topCard.color + " " + state.topCard.value;
+    document.getElementById("activeColor").textContent = state.activeColor;
+
+    const playersDiv = document.getElementById("players");
+    playersDiv.innerHTML = "";
+    for (const p of state.players) {
+      const el = document.createElement("div");
+      el.className = "player" + (p.id === state.turnPlayerId ? " turn" : "");
+      el.textContent = `${p.name}${p.id === myId ? " (you)" : ""} — ${p.handCount} cards${p.id === state.turnPlayerId ? " ⟵ TURN" : ""}`;
+      playersDiv.appendChild(el);
+    }
+
+    const handDiv = document.getElementById("hand");
+    handDiv.innerHTML = "";
+    const myTurn = state.turnPlayerId === myId;
+    state.yourHand.forEach((card, i) => {
+      const el = document.createElement("div");
+      const legal = myTurn && isLegal(card, state.topCard, state.activeColor);
+      el.className = "card " + card.color + (myTurn ? (legal ? " legal" : " illegal") : "");
+      el.textContent = card.value;
+      el.onclick = () => { if (legal) playCard(i); };
+      handDiv.appendChild(el);
+    });
+  });
+
+  socket.on("ERROR_MSG", (text) => {
+    document.getElementById("msg").textContent = text;
+  });
+
+  socket.on("GAME_OVER", ({ winner }) => {
+    document.getElementById("msg").textContent = `🎉 ${winner} wins!`;
+  });
+</script>
+</body>
+</html>

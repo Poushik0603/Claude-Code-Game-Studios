@@ -5,83 +5,82 @@
 
 ## Engine & Language
 
-- **Engine**: [TO BE CONFIGURED — run /setup-engine]
-- **Language**: [TO BE CONFIGURED]
-- **Rendering**: [TO BE CONFIGURED]
-- **Physics**: [TO BE CONFIGURED]
+- **Engine**: None — this is a web application, not an engine-based game.
+- **Language**: TypeScript everywhere (backend, frontend, and shared rules package)
+- **Rendering**: DOM/CSS + React for UI and card table; no canvas/WebGL required unless animation needs demand it later
+- **Physics**: N/A
 
 ## Input & Platform
 
-<!-- Written by /setup-engine. Read by /ux-design, /ux-review, /test-setup, /team-ui, and /dev-story -->
-<!-- to scope interaction specs, test helpers, and implementation to the correct input methods. -->
-
-- **Target Platforms**: [TO BE CONFIGURED — e.g., PC, Console, Mobile, Web]
-- **Input Methods**: [TO BE CONFIGURED — e.g., Keyboard/Mouse, Gamepad, Touch, Mixed]
-- **Primary Input**: [TO BE CONFIGURED — the dominant input for this game]
-- **Gamepad Support**: [TO BE CONFIGURED — Full / Partial / None]
-- **Touch Support**: [TO BE CONFIGURED — Full / Partial / None]
-- **Platform Notes**: [TO BE CONFIGURED — any platform-specific UX constraints]
+- **Target Platforms**: Web (desktop, tablet, phone browsers) now — native mobile app (iOS/Android) planned as a future phase
+- **Input Methods**: Mouse/keyboard and touch, both fully supported from day one
+- **Primary Input**: Touch/click on cards (tap-to-play), not drag-and-drop, so the interaction pattern ports cleanly to mobile later
+- **Gamepad Support**: None
+- **Touch Support**: Full — required, since phone play is a primary use case per the brief
+- **Platform Notes**: Because a mobile app is planned later, keep all game rules, state shapes, and
+  validation logic in the shared TypeScript package (not embedded in React components) so a future
+  React Native client can reuse them directly. Avoid browser-only APIs in shared/game-logic code.
 
 ## Naming Conventions
 
-- **Classes**: [TO BE CONFIGURED]
-- **Variables**: [TO BE CONFIGURED]
-- **Signals/Events**: [TO BE CONFIGURED]
-- **Files**: [TO BE CONFIGURED]
-- **Scenes/Prefabs**: [TO BE CONFIGURED]
-- **Constants**: [TO BE CONFIGURED]
+- **Classes**: PascalCase (e.g., `GameRoom`, `UnoNoMercyEngine`)
+- **Variables/functions**: camelCase
+- **Events (WebSocket messages)**: SCREAMING_SNAKE_CASE string constants (e.g., `PLAY_CARD`, `ROOM_STATE_SYNC`)
+- **Files**: kebab-case (e.g., `game-room.ts`, `uno-no-mercy-engine.ts`)
+- **React components**: PascalCase filenames matching the component (e.g., `GameTable.tsx`)
+- **Constants**: SCREAMING_SNAKE_CASE
 
 ## Performance Budgets
 
-- **Target Framerate**: [TO BE CONFIGURED]
-- **Frame Budget**: [TO BE CONFIGURED]
-- **Draw Calls**: [TO BE CONFIGURED]
-- **Memory Ceiling**: [TO BE CONFIGURED]
+- **Target Framerate**: 60fps UI animations (CSS/JS transitions), not a fixed game-loop framerate
+- **Frame Budget**: N/A (event-driven UI, not a render loop)
+- **Draw Calls**: N/A
+- **Memory Ceiling**: Server: bounded per-room state only (no history/replay storage); Client: standard web app budget for low-end mobile browsers
 
 ## Testing
 
-- **Framework**: [TO BE CONFIGURED]
-- **Minimum Coverage**: [TO BE CONFIGURED]
-- **Required Tests**: Balance formulas, gameplay systems, networking (if applicable)
+- **Framework**: Vitest (unit tests for game logic/rules engine), Playwright (integration/E2E for room + reconnect flows)
+- **Minimum Coverage**: 100% of rules-engine branches for each game mode (turn validation, stacking, elimination, scoring)
+- **Required Tests**: Turn-order/legality enforcement, reconnection state recovery, each mode's rule engine, WebSocket message contracts
 
 ## Forbidden Patterns
 
-<!-- Add patterns that should never appear in this project's codebase -->
-- [None configured yet — add as architectural decisions are made]
+- Trusting the client for any game-logic decision (legality, turn order, scoring) — server is always authoritative
+- Embedding game rules inside React components or UI code — rules live only in the shared engine package
+- Storing player hands or full game state in client-readable form beyond what that player is entitled to see
 
 ## Allowed Libraries / Addons
 
-<!-- Add approved third-party dependencies here -->
-- [None configured yet — add as dependencies are approved]
+- **Backend**: Node.js, TypeScript, Socket.IO (or `ws`), Express (or Fastify) for HTTP bootstrap
+- **Frontend**: React, TypeScript, Vite, a lightweight animation library (e.g., Framer Motion) for card/table motion
+- **Testing**: Vitest, Playwright
+- [Additional dependencies added here as they're approved]
 
 ## Architecture Decisions Log
 
 <!-- Quick reference linking to full ADRs in docs/architecture/ -->
 - [No ADRs yet — use /architecture-decision to create one]
 
-## Engine Specialists
+## Technical Specialists
 
-<!-- Written by /setup-engine when engine is configured. -->
 <!-- Read by /code-review, /architecture-decision, /architecture-review, and team skills -->
-<!-- to know which specialist to spawn for engine-specific validation. -->
+<!-- to know which specialist to spawn for validation. No engine specialists apply to this project. -->
 
-- **Primary**: [TO BE CONFIGURED — run /setup-engine]
-- **Language/Code Specialist**: [TO BE CONFIGURED]
-- **Shader Specialist**: [TO BE CONFIGURED]
-- **UI Specialist**: [TO BE CONFIGURED]
-- **Additional Specialists**: [TO BE CONFIGURED]
-- **Routing Notes**: [TO BE CONFIGURED]
+- **Primary**: `lead-programmer` (code architecture, review, standards)
+- **Realtime/Networking**: `network-programmer` (WebSocket protocol, state replication, reconnection, turn synchronization)
+- **Gameplay/Rules Logic**: `gameplay-programmer` (per-mode rule engines: Normal, No Mercy, Flip)
+- **UI Specialist**: `ui-programmer` (React components, game table, lobby, HUD)
+- **Security**: `security-engineer` (server authority enforcement, anti-cheat, input validation)
+- **Infra**: `devops-engineer` (build pipeline, deployment, CI)
+- **Routing Notes**: No `godot-*`, `unity-*`, `unreal-*`, or `ue-*` specialists apply — this is not an engine project.
 
 ### File Extension Routing
 
-<!-- Skills use this table to select the right specialist per file type. -->
-<!-- If a row says [TO BE CONFIGURED], fall back to Primary for that file type. -->
-
 | File Extension / Type | Specialist to Spawn |
 |-----------------------|---------------------|
-| Game code (primary language) | [TO BE CONFIGURED] |
-| Shader / material files | [TO BE CONFIGURED] |
-| UI / screen files | [TO BE CONFIGURED] |
-| Scene / prefab / level files | [TO BE CONFIGURED] |
-| Native extension / plugin files | [TO BE CONFIGURED] |
+| `.ts` in shared rules/game-logic package | `gameplay-programmer` |
+| `.ts` in server (rooms, sockets, matchmaking) | `network-programmer` |
+| `.tsx` / React components | `ui-programmer` |
+| Auth/validation/anti-cheat code | `security-engineer` |
+| Build config, CI, deployment | `devops-engineer` |
 | General architecture review | Primary |

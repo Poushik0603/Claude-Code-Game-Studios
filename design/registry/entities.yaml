@@ -48,7 +48,56 @@ last_updated: ""
 # Attribute fields: any key stats that could appear in another GDD
 #   (health, damage, drops, faction, etc.)
 
-entities: []
+entities:
+  - name: room_settings_schema
+    status: active
+    source: design/gdd/room-settings-config.md
+    referenced_by:
+      - design/gdd/room-settings-config.md
+    fields: [maxPlayers, mode, zeroSevenRule, turnTimerSeconds]
+    max_players_range: [2, 12]
+    max_players_default: 4
+    mode_enum: [normal, no_mercy, flip, dos]
+    mode_default: normal
+    mode_startable_in_mvp: [normal]
+    zero_seven_rule_default: false
+    zero_seven_rule_derivation: "normal=host-togglable (default false); no_mercy=always true (mandatory); flip/dos=always false (not applicable)"
+    turn_timer_seconds_enum: [0, 15, 30, 60]
+    turn_timer_seconds_default: 0
+    notes: "Partial UPDATE_ROOM_SETTINGS payloads allowed; validated and applied atomically (all-or-nothing). Host-only, lobby-state-only editable."
+    added: 2026-09-29
+    revised: ""
+
+  - name: player_identity_model
+    status: active
+    source: design/gdd/player-identity-session.md
+    referenced_by:
+      - design/gdd/player-identity-session.md
+    fields: [sessionId, playerId, displayName]
+    notes: "sessionId is PRIVATE (crypto.randomUUID(), stored client-side in sessionStorage, never sent to other clients or logs). playerId is PUBLIC-safe, server-assigned, used in all broadcasts referencing a player. displayName is not unique — never merged/blocked on collision."
+    added: 2026-09-29
+    revised: ""
+
+  - name: standard_card_schema
+    status: active
+    source: design/gdd/card-deck-primitives.md
+    referenced_by:
+      - design/gdd/card-deck-primitives.md
+    fields: [id, kind, color, value]
+    kind_values: ["number", "action", "wild"]
+    notes: "Immutable value object. Wild's chosen color is tracked in room state, never mutated onto the card itself."
+    added: 2026-09-29
+    revised: ""
+
+  - name: flip_dual_card_schema
+    status: active
+    source: design/gdd/card-deck-primitives.md
+    referenced_by:
+      - design/gdd/card-deck-primitives.md
+    fields: [id, "kind: flip-dual", lightFace, darkFace]
+    notes: "lightFace and darkFace each hold {color, value}. Which face is active is derived from room state (activeSide), never stored on the card."
+    added: 2026-09-29
+    revised: ""
 
 # Example (remove when first real entry is added):
 #
@@ -106,7 +155,48 @@ items: []
 #   output_range[min, max], added
 # Optional: expression (the actual formula), notes
 
-formulas: []
+formulas:
+  - name: session_id_collision_probability
+    status: active
+    source: design/gdd/player-identity-session.md
+    referenced_by:
+      - design/gdd/player-identity-session.md
+    variables:
+      - n
+    output_range: [0, 1]
+    expression: "P_collision ≈ (n^2) / (2 * 2^122)"
+    notes: "Justifies why no server-side uniqueness check is needed for crypto.randomUUID()-based sessionIds at this game's scale (effectively 0 even at n=10^6)."
+    added: 2026-09-29
+    revised: ""
+
+  - name: intent_rate_limit
+    status: active
+    source: design/gdd/websocket-message-protocol.md
+    referenced_by:
+      - design/gdd/websocket-message-protocol.md
+    variables:
+      - intents_received_in_window
+      - max_intents_per_window
+      - window_ms
+    output_range: [0, 1]
+    expression: "is_rejected = (intents_received_in_window > max_intents_per_window)"
+    notes: "Boolean gate. Default tuning: max_intents_per_window=20, window_ms=1000 (unvalidated estimate, see Open Questions in source GDD)."
+    added: 2026-09-29
+    revised: ""
+
+  - name: reshuffle_on_empty
+    status: active
+    source: design/gdd/card-deck-primitives.md
+    referenced_by:
+      - design/gdd/card-deck-primitives.md
+    variables:
+      - drawPile
+      - discardPile
+    output_range: [1, 1]
+    expression: "if drawPile.isEmpty(): topCard = discardPile.pop(); drawPile = shuffle(discardPile); discardPile = [topCard]; return drawPile.pop()"
+    notes: "Always returns exactly 1 card, unless both piles would be empty after reshuffle (see card-deck-primitives.md Edge Cases — throws/returns explicit no-cards-available result instead)."
+    added: 2026-09-29
+    revised: ""
 
 # Example:
 #
@@ -139,7 +229,17 @@ formulas: []
 #
 # Required fields: name, status, source, referenced_by, value, unit, added
 
-constants: []
+constants:
+  - name: mvp_message_type_catalog
+    status: active
+    source: design/gdd/websocket-message-protocol.md
+    referenced_by:
+      - design/gdd/websocket-message-protocol.md
+    value: "Intents: JOIN_ROOM, LEAVE_ROOM, START_GAME, KICK_PLAYER, UPDATE_ROOM_SETTINGS, PLAY_CARD, DRAW_CARD, CALL_UNO, CATCH_UNO, PLAY_AGAIN. Broadcasts: ROOM_STATE_SYNC, GAME_STATE_SYNC, ERROR_MSG, GAME_OVER, PLAYER_DISCONNECTED, PLAYER_RECONNECTED."
+    unit: "message type names (SCREAMING_SNAKE_CASE)"
+    notes: "MVP-tier (Room/Lobby + Normal UNO) only. No Mercy/Flip will add mode-specific types additively — see source GDD Open Questions."
+    added: 2026-09-29
+    revised: ""
 
 # Example:
 #

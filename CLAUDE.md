@@ -1,26 +1,27 @@
-# Claude Code Game Studios -- Game Studio Agent Architecture
+# UNO Online
 
-Indie game development managed through 49 coordinated Claude Code subagents.
-Each agent owns a specific domain, enforcing separation of concerns and quality.
+Real-time multiplayer UNO in the browser — no installs, no accounts, just a room code.
+Built with Claude Code Game Studios: indie development managed through 49 coordinated
+Claude Code subagents, each owning a specific domain to enforce separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: [CHOOSE: Godot 4 / Unity / Unreal Engine 5]
-- **Language**: [CHOOSE: GDScript / C# / C++ / Blueprint]
+- **Platform**: Web application (browser, no install, no account) — mobile app planned as a future phase
+- **Backend**: Node.js + TypeScript, authoritative game server over WebSockets (Socket.IO)
+- **Frontend**: React + TypeScript (Vite)
+- **Shared package**: Game rules, state types, and validation logic live in a shared TypeScript package
+  consumed by both server and client, so a future React Native client can reuse the same rules engine
+  instead of reimplementing it.
 - **Version Control**: Git with trunk-based development
-- **Build System**: [SPECIFY after choosing engine]
-- **Asset Pipeline**: [SPECIFY after choosing engine]
+- **Build System**: Vite (frontend), tsc/esbuild (backend)
+- **Asset Pipeline**: Static assets served directly (cards, sounds, sprites) — no engine import pipeline
 
-> **Note**: Engine-specialist agents exist for Godot, Unity, and Unreal with
-> dedicated sub-specialists. Use the set matching your engine.
+> **Note**: This is not a game-engine project. Godot/Unity/Unreal engine-specialist agents do not apply.
+> Use the web-stack specialists instead — see Technical Preferences → Technical Specialists.
 
 ## Project Structure
 
 @.claude/docs/directory-structure.md
-
-## Engine Version Reference
-
-@docs/engine-reference/godot/VERSION.md
 
 ## Technical Preferences
 

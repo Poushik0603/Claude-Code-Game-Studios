@@ -27,7 +27,7 @@ ADR Dependencies, Engine Compatibility, GDD Requirements Addressed
 
 ## Engine Reference (`docs/engine-reference/`)
 
-Version-pinned engine API snapshots. **Always check here before using any
-engine API** — the LLM's training data predates the pinned engine version.
-
-Current engine: see `docs/engine-reference/godot/VERSION.md`
+Not applicable to this project — UNO Online is a web application (Node.js/TypeScript
+backend, React/TypeScript frontend), not an engine-based game. See `CLAUDE.md` →
+Technology Stack. The Godot/Unity/Unreal snapshots under this directory are unused
+template scaffolding and should not be consulted.

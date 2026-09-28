@@ -4,13 +4,16 @@
 /
 ├── CLAUDE.md                    # Master configuration
 ├── .claude/                     # Agent definitions, skills, hooks, rules, docs
-├── src/                         # Game source code (core, gameplay, ai, networking, ui, tools)
-├── assets/                      # Game assets (art, audio, vfx, shaders, data)
-├── design/                      # Game design documents (gdd, narrative, levels, balance)
+├── src/                         # Application source code
+│   ├── shared/                  # Game rules, state types, validation logic (consumed by server + client)
+│   ├── server/                  # Node.js/TypeScript authoritative game server (rooms, sockets, matchmaking)
+│   └── client/                  # React/TypeScript frontend (Vite) — lobby, game table, UI
+├── assets/                      # Static assets (card art, sounds, sprites) — served directly, no import pipeline
+├── design/                      # Game design documents (gdd, ux, registry)
 ├── docs/                        # Technical documentation (architecture, api, postmortems)
-│   └── engine-reference/        # Curated engine API snapshots (version-pinned)
-├── tests/                       # Test suites (unit, integration, performance, playtest)
-├── tools/                       # Build and pipeline tools (ci, build, asset-pipeline)
+│   └── engine-reference/        # Not used — this is a non-engine web project; see CLAUDE.md
+├── tests/                       # Test suites (unit, integration/E2E, playtest)
+├── tools/                       # Build and pipeline tools (ci, build)
 ├── prototypes/                  # Throwaway prototypes (isolated from src/)
 └── production/                  # Production management (sprints, milestones, releases)
     ├── session-state/           # Ephemeral session state (active.md — gitignored)

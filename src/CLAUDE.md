@@ -2,11 +2,13 @@
 
 When writing or editing game code in this directory, follow these standards.
 
-## Engine Version Warning
+## Stack
 
-The LLM's training data predates the pinned engine version.
-**Always check `docs/engine-reference/` before using any engine API.**
-Do not guess at post-cutoff API signatures — look them up first.
+This is a web application (Node.js/TypeScript backend + React/TypeScript frontend) — not an
+engine-based game. No `docs/engine-reference/` lookups apply here.
+
+Keep game rules and state logic in the shared TypeScript package, not in server or client code
+directly — this is what lets a future React Native mobile client reuse the same rules engine.
 
 ## Coding Standards
 
@@ -18,10 +20,10 @@ Do not guess at post-cutoff API signatures — look them up first.
 
 ## File Routing
 
-Match the engine-specialist agent to the file type being written.
-See `CLAUDE.md` → Technical Preferences → Engine Specialists → File Extension Routing.
+Match the specialist agent to the file type being written.
+See `CLAUDE.md` → Technical Preferences → Technical Specialists → File Extension Routing.
 
-When in doubt, use the primary engine specialist configured in `CLAUDE.md`.
+When in doubt, use the primary specialist (`lead-programmer`) configured in `CLAUDE.md`.
 
 ## Tests
 
